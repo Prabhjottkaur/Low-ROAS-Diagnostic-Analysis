@@ -1,0 +1,218 @@
+select * from global_ads2;
+
+What is the campaign-level ROAS across dimensions?
+
+WITH campaign_yearly AS (
+    SELECT
+        platform,
+        campaign_type,
+        industry,
+        country,
+        SUM(ad_spend) AS total_spend,
+        SUM(revenue) AS total_revenue,
+        SUM(revenue) / NULLIF(SUM(ad_spend), 0) AS roas_yearly
+    FROM global_ads2
+    GROUP BY 
+        platform,
+        campaign_type,
+        industry,
+        country
+)
+
+SELECT *
+FROM campaign_yearly;
+
+What ROAS threshold should define “Low ROAS” campaigns?
+
+WITH campaign_yearly AS (
+    SELECT
+        platform,
+        campaign_type,
+        industry,
+        country,
+        SUM(revenue) / NULLIF(SUM(ad_spend),0) AS roas_yearly
+    FROM global_ads2
+    GROUP BY 
+        platform,
+        campaign_type,
+        industry,
+        country
+),
+
+ordered AS (
+    SELECT 
+        roas_yearly,
+        ROW_NUMBER() OVER (ORDER BY roas_yearly) AS rn,
+        COUNT(*) OVER () AS total_rows
+    FROM campaign_yearly
+)
+
+SELECT roas_yearly
+FROM ordered
+WHERE rn = FLOOR(total_rows * 0.25);
+
+
+Which campaigns belong to Low vs High ROAS segments?
+
+WITH campaign_yearly AS (
+    SELECT
+        platform,
+        campaign_type,
+        industry,
+        country,
+        SUM(ad_spend) AS total_spend,
+        SUM(revenue) AS total_revenue,
+        SUM(revenue) / SUM(ad_spend) AS roas_yearly
+    FROM global_ads2
+    GROUP BY 
+        platform,
+        campaign_type,
+        industry,
+        country
+)
+
+SELECT
+    *,
+    CASE
+        WHEN roas_yearly <= 3.07 THEN 'Low ROAS'
+        ELSE 'High ROAS'
+    END AS roas_segment
+FROM campaign_yearly
+ORDER BY roas_yearly ASC;
+
+Which funnel metrics differ between Low vs High ROAS campaigns?
+Query
+SELECT
+    CASE 
+        WHEN roas_calculated <= 3.07 THEN 'Low ROAS'
+        ELSE 'High ROAS'
+    END AS roas_segment,
+
+    SUM(clicks) * 1.0 / NULLIF(SUM(impressions), 0) AS ctr,
+    SUM(ad_spend) * 1.0 / NULLIF(SUM(clicks), 0) AS cpc,
+    SUM(conversions) * 1.0 / NULLIF(SUM(clicks), 0) AS conversion_rate,
+    SUM(ad_spend) * 1.0 / NULLIF(SUM(conversions), 0) AS cpa
+
+FROM global_ads2
+GROUP BY roas_segment;
+
+Does platform influence low ROAS performance?
+Query
+SELECT
+    platform,
+
+    CASE 
+        WHEN roas_calculated <= 3.07 THEN 'Low ROAS'
+        ELSE 'High ROAS'
+    END AS roas_segment,
+
+    SUM(clicks) * 1.0 / NULLIF(SUM(impressions), 0) AS ctr,
+    SUM(ad_spend) * 1.0 / NULLIF(SUM(clicks), 0) AS cpc,
+    SUM(conversions) * 1.0 / NULLIF(SUM(clicks), 0) AS conversion_rate,
+    SUM(ad_spend) * 1.0 / NULLIF(SUM(conversions), 0) AS cpa
+
+FROM global_ads2
+GROUP BY
+    platform,
+    roas_segment
+ORDER BY
+    platform,
+    roas_segment;
+
+
+Does country influence low ROAS performance?
+Query
+SELECT
+   country,
+
+   CASE
+       WHEN roas_calculated <= 3.07 THEN 'Low ROAS'
+       ELSE 'High ROAS'
+   END AS roas_segment,
+
+   SUM(clicks) * 1.0 / NULLIF(SUM(impressions),0) AS ctr,
+   SUM(ad_spend) * 1.0 / NULLIF(SUM(clicks),0) AS cpc,
+   SUM(conversions) * 1.0 / NULLIF(SUM(clicks),0) AS conversion_rate,
+   SUM(ad_spend) * 1.0 / NULLIF(SUM(conversions),0) AS cpa
+
+FROM global_ads2
+GROUP BY
+   country,
+   roas_segment
+ORDER BY
+   country,
+   roas_segment;
+
+Does industry influence low ROAS performance?
+Query
+SELECT
+   industry,
+
+   CASE
+       WHEN roas_calculated <= 3.07 THEN 'Low ROAS'
+       ELSE 'High ROAS'
+   END AS roas_segment,
+
+   SUM(clicks) * 1.0 / NULLIF(SUM(impressions),0) AS ctr,
+   SUM(ad_spend) * 1.0 / NULLIF(SUM(clicks),0) AS cpc,
+   SUM(conversions) * 1.0 / NULLIF(SUM(clicks),0) AS conversion_rate,
+   SUM(ad_spend) * 1.0 / NULLIF(SUM(conversions),0) AS cpa
+
+FROM global_ads2
+GROUP BY
+   industry,
+   roas_segment
+ORDER BY
+   industry,
+   roas_segment;
+
+Which country-platform-campaign combinations show low ROAS behavior?
+Query
+SELECT
+    country,
+    platform,
+    campaign_type,
+
+    CASE 
+        WHEN roas_calculated <= 3.07 THEN 'Low ROAS'
+        ELSE 'High ROAS'
+    END AS roas_segment,
+    
+    SUM(clicks) * 1.0 / NULLIF(SUM(impressions),0) AS ctr,
+    SUM(ad_spend) * 1.0 / NULLIF(SUM(clicks),0) AS cpc,
+    SUM(conversions) * 1.0 / NULLIF(SUM(clicks),0) AS conversion_rate,
+    SUM(ad_spend) * 1.0 / NULLIF(SUM(conversions),0) AS cpa
+
+FROM global_ads2
+GROUP BY
+    country,
+    platform,
+    campaign_type,
+    roas_segment;
+
+Which country-industry combinations show funnel leakage?
+Query
+SELECT
+   country,
+   industry,
+
+   CASE
+       WHEN roas_calculated <= 3.07 THEN 'Low ROAS'
+       ELSE 'High ROAS'
+   END AS roas_segment,
+
+   SUM(clicks) * 1.0 / NULLIF(SUM(impressions),0) AS ctr,
+   SUM(ad_spend) * 1.0 / NULLIF(SUM(clicks),0) AS cpc,
+   SUM(conversions) * 1.0 / NULLIF(SUM(clicks),0) AS conversion_rate,
+   SUM(ad_spend) * 1.0 / NULLIF(SUM(conversions),0) AS cpa
+
+FROM global_ads2
+GROUP BY
+   country,
+   industry,
+   roas_segment
+ORDER BY
+   country,
+   industry,
+
+
